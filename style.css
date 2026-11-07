@@ -28,3 +28,61 @@
     cursor: wait;
     opacity: 0.5;
 }
+
+@media (max-width: 600px), (pointer: coarse) {
+    /* Keep the host's chat and drawer offsets aligned with the taller touch bar. */
+    body:has(#tt-refresh) {
+        --topBarBlockSize: max(44px, calc(var(--topBarIconSize) + var(--topBarBlockPadding)));
+    }
+
+    #top-settings-holder:has(> #tt-refresh) {
+        box-sizing: border-box;
+        gap: 0;
+        padding-left: max(2px, env(safe-area-inset-left, 0px));
+        padding-right: max(2px, env(safe-area-inset-right, 0px));
+    }
+
+    #top-settings-holder:has(> #tt-refresh) > .drawer:not(#tt-refresh) {
+        flex: 1 1 0;
+        min-width: 0;
+    }
+
+    #top-settings-holder:has(> #tt-refresh) > .drawer > .drawer-toggle {
+        width: 100%;
+        min-width: 0;
+        text-align: center;
+    }
+
+    #top-settings-holder:has(> #tt-refresh) > .drawer > .drawer-toggle > .drawer-icon {
+        box-sizing: border-box;
+        max-width: 100%;
+        padding-inline: 0;
+        font-size: min(var(--topBarIconSize), 5vw);
+    }
+
+    #top-settings-holder > #tt-refresh {
+        flex: 0 0 44px;
+        width: 44px;
+    }
+
+    #top-settings-holder > #tt-refresh > button {
+        appearance: none;
+        box-sizing: border-box;
+        min-width: 44px;
+        min-height: 44px;
+        max-width: none;
+        height: 100%;
+        font-size: 22px;
+        opacity: 0.85;
+        touch-action: manipulation;
+    }
+
+    #top-settings-holder > #tt-refresh > button:active:not(:disabled) {
+        opacity: 1;
+        background: var(--SmartThemeBlurTintColor, rgb(128 128 128 / 20%));
+    }
+
+    #top-settings-holder > #tt-refresh > button:disabled {
+        opacity: 0.5;
+    }
+}

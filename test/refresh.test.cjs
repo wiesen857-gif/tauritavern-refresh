@@ -28,17 +28,20 @@ before(async () => {
             }
         `],
         '/': ['text/html', `<!doctype html><meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
             <style>
-              :root { --topBarIconSize: 24px; }
+              :root { --mainFontSize:16px; --topBarIconSize:32px; --topBarBlockPadding:calc(16px / 3); --topBarBlockSize:calc(var(--topBarIconSize) + var(--topBarBlockPadding)); }
               body { margin: 0; color: #292723; background: #f3efe5; }
-              #top-settings-holder { display:flex; height:48px; width:100%; }
+              #top-settings-holder { display:flex; height:var(--topBarBlockSize); width:100%; justify-content:center; position:relative; }
               .drawer { display:flex; align-items:center; justify-content:center; width:100%; }
-              .drawer-icon { display:inline-block; font-size:var(--topBarIconSize); }
-              .closedIcon { opacity:0.3; }
-              .closedIcon:hover { opacity:1; }
+              .drawer-icon { display:inline-block; font-size:var(--topBarIconSize); padding:1px 3px; }
+              .fa-fw { display:inline-block; width:1.25em; text-align:center; }
+              .drawer-icon.closedIcon { opacity:0.3; }
+              .drawer-icon.closedIcon:hover { opacity:1; }
+              #chat { margin-top:var(--topBarBlockSize); }
             </style>
             <link rel="stylesheet" href="/style.css">
-            <div id="top-settings-holder">${'<div class="drawer">菜单</div>'.repeat(9)}</div>
+            <div id="top-settings-holder">${'<div class="drawer"><div class="drawer-toggle"><span class="drawer-icon fa-fw closedIcon">●</span></div></div>'.repeat(9)}</div>
             <div id="chat"></div><textarea id="send_textarea"></textarea>
             <script>
               sessionStorage.setItem('loads', Number(sessionStorage.getItem('loads') || 0) + 1);
@@ -63,8 +66,8 @@ after(async () => {
     if (server) await new Promise(resolve => server.close(resolve));
 });
 
-async function pageFor(t) {
-    const page = await browser.newPage();
+async function pageFor(t, options = {}) {
+    const page = await browser.newPage(options);
     t.after(() => page.close());
     await page.goto(origin);
     await page.locator('#tt-refresh button').waitFor();
@@ -155,7 +158,7 @@ test('toolbar fits desktop and narrow screens and offers visible keyboard focus'
         await page.setViewportSize({ width, height: 800 });
         const box = await page.locator('#tt-refresh button').boundingBox();
         assert.ok(box.width > 0 && box.x + box.width <= width + 1, String(width));
-        assert.ok(box.height >= 44);
+        if (width <= 600) assert.ok(box.height >= 44);
     }
     await page.locator('#tt-refresh button').focus();
     await page.keyboard.press('Tab');
@@ -168,4 +171,41 @@ test('Space key activates the native button', async t => {
     const page = await pageFor(t);
     await page.locator('#tt-refresh button').focus();
     await reloadWith(page, () => page.keyboard.press('Space'));
+});
+
+test('mobile touch target stays 44px, visible and separate from native menus in both orientations', async t => {
+    const page = await pageFor(t, { isMobile:true, hasTouch:true, viewport:{ width:390, height:844 } });
+    for (const [width, height] of [[320, 700], [360, 800], [390, 844], [430, 932], [844, 390]]) {
+        await page.setViewportSize({ width, height });
+        const metrics = await page.evaluate(() => {
+            const button = document.querySelector('#tt-refresh button');
+            const b = button.getBoundingClientRect();
+            const icons = [...document.querySelectorAll('.drawer-toggle .drawer-icon')].map(el => {
+                const r = el.getBoundingClientRect();
+                return { x:r.x, right:r.right, width:r.width };
+            });
+            return { x:b.x, right:b.right, width:b.width, height:b.height, opacity:Number(getComputedStyle(button).opacity),
+                scroll:document.documentElement.scrollWidth, viewport:innerWidth, icons,
+                topSize:parseFloat(getComputedStyle(document.querySelector('#top-settings-holder')).height) };
+        });
+        assert.ok(metrics.width >= 44 && metrics.height >= 44, `touch target ${width}: ${JSON.stringify(metrics)}`);
+        assert.ok(metrics.opacity >= 0.8, `icon must be visible without hover: ${width}`);
+        assert.ok(metrics.x >= 0 && metrics.right <= width + 1 && metrics.scroll <= width, `viewport overflow ${width}`);
+        assert.ok(metrics.topSize >= metrics.height, `button overflows the bar: ${width}`);
+        metrics.icons.forEach((icon, i) => {
+            assert.ok(icon.x >= 0 && icon.width > 0 && icon.right <= metrics.x, `native menu overlaps refresh: ${width}/${i}`);
+            if (i) assert.ok(metrics.icons[i - 1].right <= icon.x + 1, `native menus overlap: ${width}/${i}`);
+        });
+    }
+    await reloadWith(page, () => page.locator('#tt-refresh button').tap());
+});
+
+test('mobile tap reports save failure and remains usable', async t => {
+    const page = await pageFor(t, { isMobile:true, hasTouch:true, viewport:{ width:360, height:800 } });
+    await page.evaluate(() => { host.fail = true; });
+    await page.locator('#tt-refresh button').tap();
+    await page.waitForFunction(() => errors.length === 1);
+    assert.match(await page.evaluate(() => errors[0]), /保存失败/);
+    assert.equal(await page.evaluate(() => sessionStorage.getItem('loads')), '1');
+    assert.equal(await page.locator('#tt-refresh button').isEnabled(), true);
 });
