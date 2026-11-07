@@ -1,0 +1,13 @@
+{
+  "name": "tauritavern-refresh",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "check": "node --check index.js",
+    "test": "node --test test/refresh.test.cjs"
+  },
+  "devDependencies": {
+    "playwright": "1.62.1"
+  }
+}
